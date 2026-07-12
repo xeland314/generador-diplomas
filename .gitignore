@@ -4,7 +4,8 @@ __pycache__/
 dist/
 wheels/
 *.egg-info
-
+build/build-linux
+generador-diplomas.spec
 # Virtual environments
 .venv
 

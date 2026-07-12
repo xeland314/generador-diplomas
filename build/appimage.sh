@@ -6,7 +6,22 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$PROJECT_DIR/build/build-linux"
 DIST_DIR="$PROJECT_DIR/dist"
 APPDIR="$DIST_DIR/GeneradorDiplomas.AppDir"
-APPIMAGE_NAME="GeneradorDiplomas-x86_64.AppImage"
+RAW_ARCH="$(uname -m)"
+case "$RAW_ARCH" in
+    x86_64|amd64)
+        ARCH="x86_64"
+        ;;
+    aarch64|arm64)
+        ARCH="aarch64"
+        ;;
+    armv7l|armv6l)
+        ARCH="armhf"
+        ;;
+    *)
+        ARCH="$RAW_ARCH"
+        ;;
+esac
+APPIMAGE_NAME="GeneradorDiplomas-${ARCH}.AppImage"
 
 echo "=== Creating AppImage ==="
 
@@ -40,8 +55,11 @@ EOF
 
 cp "$APPDIR/generador-diplomas.desktop" "$APPDIR/usr/share/applications/"
 
-# Paso 5: buscar un icono o crear uno basico
-if [ -f "$PROJECT_DIR/assets/diploma_escuela_v7.jpg" ]; then
+# Paso 5: usar el icono del proyecto para la AppImage
+if [ -f "$PROJECT_DIR/assets/logo.png" ]; then
+    cp "$PROJECT_DIR/assets/logo.png" "$APPDIR/usr/share/icons/hicolor/256x256/apps/generador-diplomas.png"
+    cp "$APPDIR/usr/share/icons/hicolor/256x256/apps/generador-diplomas.png" "$APPDIR/generador-diplomas.png"
+elif [ -f "$PROJECT_DIR/assets/diploma_escuela_v7.jpg" ]; then
     cp "$PROJECT_DIR/assets/diploma_escuela_v7.jpg" "$APPDIR/usr/share/icons/hicolor/256x256/apps/generador-diplomas.jpg"
     cp "$APPDIR/usr/share/icons/hicolor/256x256/apps/generador-diplomas.jpg" "$APPDIR/generador-diplomas.jpg"
 fi
@@ -67,7 +85,7 @@ fi
 
 # Paso 8: generar la AppImage
 echo "--- Building AppImage ---"
-"$APPIMAGETOOL" --no-appstream "$APPDIR" "$DIST_DIR/$APPIMAGE_NAME"
+ARCH="$ARCH" "$APPIMAGETOOL" --no-appstream "$APPDIR" "$DIST_DIR/$APPIMAGE_NAME"
 
 rm -rf "$APPDIR"
 
