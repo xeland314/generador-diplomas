@@ -1,11 +1,11 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
-build/
 dist/
 wheels/
 *.egg-info
-
+build/build-linux
+generador-diplomas.spec
 # Virtual environments
 .venv
 
