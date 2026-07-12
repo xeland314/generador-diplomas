@@ -7,13 +7,14 @@ from src.generator.excel_handler import (
     validar_columnas,
 )
 from src.generator.pptx_generator import extraer_etiquetas, generar_certificados
+from src.ui.form import FormularioRegistro
 
 
 class Aplicacion:
     def __init__(self, root):
         self.root = root
         self.root.title("Generador de Diplomas")
-        self.root.geometry("750x600")
+        self.root.geometry("800x650")
         self.root.resizable(False, False)
 
         self.ruta_plantilla = tk.StringVar()
@@ -72,10 +73,43 @@ class Aplicacion:
         )
         self.lbl_validacion.pack(anchor=tk.W, pady=(0, 5))
 
+        group_registros = ttk.LabelFrame(
+            frame_principal, text=" 3. Registros ", padding=10
+        )
+        group_registros.pack(fill=tk.X, pady=(0, 5))
+
+        self.btn_agregar = ttk.Button(
+            group_registros, text="+ Agregar", command=self._agregar_registro
+        )
+        self.btn_agregar.pack(side=tk.LEFT, padx=(0, 5))
+
+        self.btn_editar = ttk.Button(
+            group_registros,
+            text="Editar",
+            command=self._editar_registro,
+            state=tk.DISABLED,
+        )
+        self.btn_editar.pack(side=tk.LEFT, padx=(0, 5))
+
+        self.btn_eliminar = ttk.Button(
+            group_registros,
+            text="Eliminar",
+            command=self._eliminar_registro,
+            state=tk.DISABLED,
+        )
+        self.btn_eliminar.pack(side=tk.LEFT, padx=(0, 5))
+
+        self.lbl_conteo = ttk.Label(
+            group_registros, text="0 registros", foreground="gray"
+        )
+        self.lbl_conteo.pack(side=tk.RIGHT)
+
         self.frame_tabla = ttk.Frame(frame_principal)
         self.frame_tabla.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
-        self.tree = ttk.Treeview(self.frame_tabla, show="headings", height=8)
+        self.tree = ttk.Treeview(
+            self.frame_tabla, show="headings", height=8, selectmode="browse"
+        )
         scroll_y = ttk.Scrollbar(
             self.frame_tabla, orient=tk.VERTICAL, command=self.tree.yview
         )
@@ -83,18 +117,25 @@ class Aplicacion:
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
 
+        self.tree.bind("<<TreeviewSelect>>", self._on_seleccion)
+
+        btn_frame = ttk.Frame(frame_principal)
+        btn_frame.pack(fill=tk.X)
+
         self.btn_generar = ttk.Button(
-            frame_principal,
+            btn_frame,
             text="Generar Certificados",
             command=self._generar_certificados,
             state=tk.DISABLED,
         )
-        self.btn_generar.pack(pady=(5, 0))
+        self.btn_generar.pack(side=tk.LEFT)
 
         self.lbl_estado = ttk.Label(
-            frame_principal, text="", foreground="green"
+            btn_frame, text="", foreground="green"
         )
-        self.lbl_estado.pack(pady=(5, 0))
+        self.lbl_estado.pack(side=tk.LEFT, padx=(15, 0))
+
+    # --- Plantilla ---
 
     def _cargar_plantilla(self):
         ruta = filedialog.askopenfilename(
@@ -122,7 +163,7 @@ class Aplicacion:
             text=f"Etiquetas detectadas ({len(etiquetas)}): {', '.join(etiquetas)}",
             foreground="black",
         )
-        self._validar_si_hay_excel()
+        self._refrescar_estado()
 
     def _generar_plantilla_excel(self):
         if not self.etiquetas_pptx:
@@ -145,6 +186,8 @@ class Aplicacion:
             messagebox.showinfo("Listo", f"Plantilla Excel creada en:\n{ruta}")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo crear el Excel:\n{e}")
+
+    # --- Excel ---
 
     def _cargar_excel(self):
         if not self.etiquetas_pptx:
@@ -183,43 +226,119 @@ class Aplicacion:
         self.datos_excel = datos
         msg_ok = f"Excel valido: {len(datos)} registros, columnas correctas."
         if sobrantes:
-            msg_ok += f"\nColumnas ignoradas (no estan en la plantilla): {', '.join(sobrantes)}"
+            msg_ok += f"\nColumnas ignoradas: {', '.join(sobrantes)}"
         self.lbl_validacion.config(text=msg_ok, foreground="green")
         self.btn_generar.config(state=tk.NORMAL)
 
-        self._mostrar_preview(columnas, datos)
+        self._refrescar_tabla()
 
-    def _mostrar_preview(self, columnas, datos):
+    # --- CRUD Registros ---
+
+    def _agregar_registro(self):
+        if not self.etiquetas_pptx:
+            messagebox.showwarning(
+                "Aviso", "Primero debe cargar una plantilla PowerPoint."
+            )
+            return
+
+        form = FormularioRegistro(self.root, self.etiquetas_pptx, titulo="Agregar registro")
+        self.root.wait_window(form)
+
+        if form.resultado is None:
+            return
+
+        if not self.columnas_excel:
+            self.columnas_excel = list(self.etiquetas_pptx)
+
+        self.datos_excel.append(form.resultado)
+        self._refrescar_tabla()
+        self._refrescar_estado()
+
+    def _editar_registro(self):
+        seleccion = self.tree.selection()
+        if not seleccion:
+            return
+
+        idx = self.tree.index(seleccion[0])
+        valores = self.datos_excel[idx]
+
+        form = FormularioRegistro(
+            self.root,
+            self.etiquetas_pptx,
+            titulo="Editar registro",
+            valores=valores,
+        )
+        self.root.wait_window(form)
+
+        if form.resultado is None:
+            return
+
+        self.datos_excel[idx] = form.resultado
+        self._refrescar_tabla()
+
+        # Restaurar seleccion en la misma fila
+        hijos = self.tree.get_children()
+        if idx < len(hijos):
+            self.tree.selection_set(hijos[idx])
+            self.tree.focus(hijos[idx])
+
+    def _eliminar_registro(self):
+        seleccion = self.tree.selection()
+        if not seleccion:
+            return
+
+        idx = self.tree.index(seleccion[0])
+        registro = self.datos_excel[idx]
+        resumen = ", ".join(f"{k}={v}" for k, v in registro.items())
+
+        confirmar = messagebox.askyesno(
+            "Confirmar eliminacion",
+            f"Eliminar este registro?\n\n{resumen}",
+        )
+        if not confirmar:
+            return
+
+        self.datos_excel.pop(idx)
+        self._refrescar_tabla()
+        self._refrescar_estado()
+
+    # --- Tabla ---
+
+    def _refrescar_tabla(self):
         self.tree.delete(*self.tree.get_children())
+
+        columnas = self.columnas_excel or self.etiquetas_pptx
+        if not columnas:
+            return
+
         self.tree["columns"] = columnas
         for col in columnas:
             self.tree.heading(col, text=col)
-            self.tree.column(col, width=120, anchor=tk.CENTER)
-        for fila in datos[:50]:
+            self.tree.column(col, width=150, anchor=tk.CENTER)
+
+        for fila in self.datos_excel:
             valores = [fila.get(c, "") for c in columnas]
             self.tree.insert("", tk.END, values=valores)
 
-    def _validar_si_hay_excel(self):
-        if self.columnas_excel and self.datos_excel:
-            es_valido, faltantes, _ = validar_columnas(
-                self.columnas_excel, self.etiquetas_pptx
-            )
-            if not es_valido:
-                self.lbl_validacion.config(
-                    text=f"El Excel cargado ya no coincide. Faltan: {', '.join(faltantes)}",
-                    foreground="red",
-                )
-                self.btn_generar.config(state=tk.DISABLED)
-            else:
-                self.lbl_validacion.config(
-                    text=f"Excel valido: {len(self.datos_excel)} registros.",
-                    foreground="green",
-                )
-                self.btn_generar.config(state=tk.NORMAL)
+    def _on_seleccion(self, _event):
+        tiene_seleccion = bool(self.tree.selection())
+        estado = tk.NORMAL if tiene_seleccion else tk.DISABLED
+        self.btn_editar.config(state=estado)
+        self.btn_eliminar.config(state=estado)
+
+    def _refrescar_estado(self):
+        n = len(self.datos_excel)
+        self.lbl_conteo.config(text=f"{n} registros")
+        if n > 0 and self.etiquetas_pptx:
+            self.btn_generar.config(state=tk.NORMAL)
+        else:
+            self.btn_generar.config(state=tk.DISABLED)
+
+    # --- Generar ---
 
     def _generar_certificados(self):
         if not self.datos_excel:
-            messagebox.showwarning("Aviso", "No hay datos de Excel cargados.")
+            messagebox.showwarning("Aviso", "No hay datos cargados.")
             return
 
         ruta_salida = filedialog.asksaveasfilename(
