@@ -12,9 +12,38 @@ uv sync
 
 ## Ejecucion
 
+### Interfaz grafica
+
 ```bash
 uv run python main.py
 ```
+
+### Linea de comandos (CLI)
+
+```bash
+# Ver etiquetas de una plantilla
+uv run python main.py inspect -p plantilla.pptx
+
+# Generar un Excel vacio con las columnas correctas
+uv run python main.py template -p plantilla.pptx -o datos.xlsx
+
+# Generar certificados
+uv run python main.py generate -p plantilla.pptx -d datos.xlsx -o salida.pptx
+```
+
+| Comando | Descripcion |
+|---|---|
+| `inspect` | Muestra las etiquetas `{{...}}` detectadas en la plantilla |
+| `template` | Genera un Excel vacio con los encabezados de la plantilla |
+| `generate` | Genera el PPTX con un certificado por cada fila del Excel |
+
+Opciones comunes:
+
+| Flag | Descripcion |
+|---|---|
+| `-p, --plantilla` | Ruta al archivo `.pptx` |
+| `-d, --datos` | Ruta al archivo `.xlsx` (solo `generate`) |
+| `-o, --salida` | Archivo de salida (default: `Certificados.pptx` o `plantilla_datos.xlsx`) |
 
 ## Funcionalidades
 
@@ -49,8 +78,9 @@ Una vez cargada la plantilla, se pueden gestionar registros directamente desde l
 
 ```
 generador-diplomas/
-├── main.py                        # Punto de entrada
+├── main.py                        # Punto de entrada (GUI o CLI)
 ├── src/
+│   ├── cli.py                     # Linea de comandos
 │   ├── generator/
 │   │   ├── pptx_generator.py      # Logica de PowerPoint
 │   │   └── excel_handler.py       # Logica de Excel

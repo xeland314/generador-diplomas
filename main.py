@@ -1,8 +1,18 @@
-import tkinter as tk
+import sys
 
-from src.ui.app import Aplicacion
+
+def main():
+    if len(sys.argv) > 1:
+        from src.cli import main as cli_main
+        sys.exit(cli_main())
+    else:
+        import tkinter as tk
+        from src.ui.app import Aplicacion
+
+        root = tk.Tk()
+        Aplicacion(root)
+        root.mainloop()
+
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = Aplicacion(root)
-    root.mainloop()
+    main()
