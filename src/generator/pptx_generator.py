@@ -55,17 +55,21 @@ def reemplazar_etiquetas(slide, datos):
                         run.text = run.text.replace(f"{{{{{clave}}}}}", str(valor))
 
 
-def generar_certificados(lista_participantes, ruta_plantilla, archivo_salida):
-    """Genera el PPTX con un slide por cada participante."""
+def generar_certificados(lista_participantes, ruta_plantilla, archivo_salida, on_progress=None):
+    """Genera el PPTX con un slide por cada participante.
+    Si se provee on_progress, se llama con (actual, total) en cada iteracion."""
     prs = Presentation(ruta_plantilla)
     plantilla = prs.slides[0]
+    total = len(lista_participantes)
 
-    for persona in lista_participantes:
+    for i, persona in enumerate(lista_participantes, start=1):
         slide = duplicar_slide(prs, plantilla)
         reemplazar_etiquetas(slide, persona)
+        if on_progress:
+            on_progress(i, total)
 
     id_slide = prs.slides._sldIdLst[0]
     prs.slides._sldIdLst.remove(id_slide)
 
     prs.save(archivo_salida)
-    return len(lista_participantes)
+    return total

@@ -1,3 +1,4 @@
+import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
@@ -134,6 +135,21 @@ class Aplicacion:
             btn_frame, text="", foreground="green"
         )
         self.lbl_estado.pack(side=tk.LEFT, padx=(15, 0))
+
+        self.progress_frame = ttk.Frame(frame_principal)
+        self.progress_frame.pack(fill=tk.X, pady=(8, 0))
+
+        self.progress_bar = ttk.Progressbar(
+            self.progress_frame, mode="determinate"
+        )
+        self.progress_bar.pack(fill=tk.X, side=tk.LEFT, expand=True, padx=(0, 10))
+
+        self.lbl_progreso = ttk.Label(
+            self.progress_frame, text="", width=20
+        )
+        self.lbl_progreso.pack(side=tk.RIGHT)
+
+        self.progress_frame.pack_forget()
 
     # --- Plantilla ---
 
@@ -350,16 +366,53 @@ class Aplicacion:
         if not ruta_salida:
             return
 
+        self._bloquear_ui(True)
+        self.progress_bar["value"] = 0
+        self.progress_bar["maximum"] = len(self.datos_excel)
+        self.lbl_progreso.config(text=f"0 / {len(self.datos_excel)}")
+        self.progress_frame.pack(fill=tk.X, pady=(8, 0))
+
+        thread = threading.Thread(
+            target=self._worker_generar,
+            args=(self.datos_excel, self.ruta_plantilla.get(), ruta_salida),
+            daemon=True,
+        )
+        thread.start()
+
+    def _worker_generar(self, datos, plantilla, salida):
         try:
             cantidad = generar_certificados(
-                self.datos_excel, self.ruta_plantilla.get(), ruta_salida
+                datos, plantilla, salida,
+                on_progress=lambda act, tot: self.root.after(
+                    0, self._actualizar_progreso, act, tot
+                ),
             )
+            self.root.after(0, self._finalizar_generacion, cantidad, salida, None)
+        except Exception as e:
+            self.root.after(0, self._finalizar_generacion, 0, salida, e)
+
+    def _actualizar_progreso(self, actual, total):
+        self.progress_bar["value"] = actual
+        self.lbl_progreso.config(text=f"{actual} / {total}")
+
+    def _finalizar_generacion(self, cantidad, salida, error):
+        self.progress_frame.pack_forget()
+        self._bloquear_ui(False)
+
+        if error:
+            messagebox.showerror(
+                "Error", f"No se pudieron generar los certificados:\n{error}"
+            )
+        else:
             messagebox.showinfo(
                 "Listo",
-                f"Se generaron {cantidad} certificados en:\n{ruta_salida}",
+                f"Se generaron {cantidad} certificados en:\n{salida}",
             )
             self.lbl_estado.config(text=f"Certificados generados: {cantidad}")
-        except Exception as e:
-            messagebox.showerror(
-                "Error", f"No se pudieron generar los certificados:\n{e}"
-            )
+
+    def _bloquear_ui(self, bloquear):
+        estado = tk.DISABLED if bloquear else tk.NORMAL
+        self.btn_generar.config(state=estado)
+        self.btn_agregar.config(state=estado)
+        self.btn_editar.config(state=estado if bloquear else tk.NORMAL)
+        self.btn_eliminar.config(state=estado if bloquear else tk.NORMAL)
